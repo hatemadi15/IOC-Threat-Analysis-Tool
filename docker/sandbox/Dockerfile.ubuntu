@@ -1,0 +1,65 @@
+# Ubuntu 20.04 Sandbox Environment
+FROM ubuntu:20.04
+
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
+ENV SANDBOX_USER=analyst
+ENV SANDBOX_HOME=/home/${SANDBOX_USER}
+
+# Install system packages
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    strace \
+    ltrace \
+    tcpdump \
+    wireshark-common \
+    volatility \
+    binutils \
+    file \
+    strings \
+    hexdump \
+    unzip \
+    curl \
+    wget \
+    net-tools \
+    procps \
+    psmisc \
+    lsof \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create sandbox user
+RUN useradd -m -s /bin/bash ${SANDBOX_USER} && \
+    chown -R ${SANDBOX_USER}:${SANDBOX_USER} ${SANDBOX_HOME}
+
+# Install Python analysis tools
+RUN pip3 install \
+    pefile \
+    yara-python \
+    requests \
+    psutil \
+    scapy
+
+# Create analysis directories
+RUN mkdir -p ${SANDBOX_HOME}/{samples,reports,logs,tools} && \
+    chown -R ${SANDBOX_USER}:${SANDBOX_USER} ${SANDBOX_HOME}
+
+# Copy analysis scripts
+COPY scripts/ ${SANDBOX_HOME}/tools/
+RUN chmod +x ${SANDBOX_HOME}/tools/*.py && \
+    chown -R ${SANDBOX_USER}:${SANDBOX_USER} ${SANDBOX_HOME}/tools
+
+# Set up monitoring
+RUN mkdir -p /var/log/sandbox && \
+    touch /var/log/sandbox/activity.log && \
+    chmod 666 /var/log/sandbox/activity.log
+
+# Configure network isolation (will be enforced by Docker)
+RUN echo "network isolation configured" > /etc/sandbox-config
+
+# Switch to sandbox user
+USER ${SANDBOX_USER}
+WORKDIR ${SANDBOX_HOME}
+
+# Default command
+CMD ["/bin/bash", "-c", "while true; do sleep 30; done"]
